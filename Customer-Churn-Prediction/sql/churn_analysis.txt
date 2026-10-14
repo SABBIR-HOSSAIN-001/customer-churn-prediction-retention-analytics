@@ -1,0 +1,161 @@
+-- =========================================================
+-- PROJECT: Customer Churn Prediction & Retention Analytics
+-- DATABASE: customer_churn_db
+-- TABLE: public.customer_churn
+-- TOOL: PostgreSQL
+-- =========================================================
+
+
+-- 1. OVERALL CHURN OVERVIEW
+CREATE OR REPLACE VIEW public.vw_churn_overview AS
+SELECT
+    COUNT(*) AS total_customers,
+    COUNT(*) FILTER (WHERE churn = 'Yes') AS churned_customers,
+    COUNT(*) FILTER (WHERE churn = 'No') AS retained_customers,
+    ROUND(
+        100.0 * COUNT(*) FILTER (WHERE churn = 'Yes')
+        / NULLIF(COUNT(*), 0), 2
+    ) AS churn_rate_pct,
+    ROUND(AVG(tenure::NUMERIC), 2) AS avg_tenure_months,
+    ROUND(AVG(monthlycharges::NUMERIC), 2) AS avg_monthly_charges,
+    ROUND(AVG(totalcharges::NUMERIC), 2) AS avg_total_charges
+FROM public.customer_churn;
+
+
+-- 2. CHURN BY CONTRACT TYPE
+CREATE OR REPLACE VIEW public.vw_churn_by_contract AS
+SELECT
+    contract AS contract_type,
+    COUNT(*) AS total_customers,
+    COUNT(*) FILTER (WHERE churn = 'Yes') AS churned_customers,
+    ROUND(
+        100.0 * COUNT(*) FILTER (WHERE churn = 'Yes')
+        / NULLIF(COUNT(*), 0), 2
+    ) AS churn_rate_pct
+FROM public.customer_churn
+GROUP BY contract;
+
+
+-- 3. CHURN BY CUSTOMER TENURE
+CREATE OR REPLACE VIEW public.vw_churn_by_tenure AS
+SELECT
+    CASE
+        WHEN tenure BETWEEN 0 AND 12 THEN '0-12 Months'
+        WHEN tenure BETWEEN 13 AND 24 THEN '13-24 Months'
+        WHEN tenure BETWEEN 25 AND 48 THEN '25-48 Months'
+        WHEN tenure BETWEEN 49 AND 60 THEN '49-60 Months'
+        ELSE '61-72 Months'
+    END AS tenure_group,
+    COUNT(*) AS total_customers,
+    COUNT(*) FILTER (WHERE churn = 'Yes') AS churned_customers,
+    ROUND(
+        100.0 * COUNT(*) FILTER (WHERE churn = 'Yes')
+        / NULLIF(COUNT(*), 0), 2
+    ) AS churn_rate_pct
+FROM public.customer_churn
+GROUP BY 1;
+
+
+-- 4. CHURN BY INTERNET SERVICE
+CREATE OR REPLACE VIEW public.vw_churn_by_internet_service AS
+SELECT
+    internetservice AS internet_service,
+    COUNT(*) AS total_customers,
+    COUNT(*) FILTER (WHERE churn = 'Yes') AS churned_customers,
+    ROUND(
+        100.0 * COUNT(*) FILTER (WHERE churn = 'Yes')
+        / NULLIF(COUNT(*), 0), 2
+    ) AS churn_rate_pct
+FROM public.customer_churn
+GROUP BY internetservice;
+
+
+-- 5. CHURN BY PAYMENT METHOD
+CREATE OR REPLACE VIEW public.vw_churn_by_payment_method AS
+SELECT
+    paymentmethod AS payment_method,
+    COUNT(*) AS total_customers,
+    COUNT(*) FILTER (WHERE churn = 'Yes') AS churned_customers,
+    ROUND(
+        100.0 * COUNT(*) FILTER (WHERE churn = 'Yes')
+        / NULLIF(COUNT(*), 0), 2
+    ) AS churn_rate_pct
+FROM public.customer_churn
+GROUP BY paymentmethod;
+
+
+-- 6. CHURN BY MONTHLY CHARGES
+CREATE OR REPLACE VIEW public.vw_churn_by_monthly_charges AS
+SELECT
+    CASE
+        WHEN monthlycharges::NUMERIC < 35 THEN 'Low (<35)'
+        WHEN monthlycharges::NUMERIC < 70 THEN 'Medium (35-69.99)'
+        ELSE 'High (70+)'
+    END AS monthly_charge_group,
+    COUNT(*) AS total_customers,
+    COUNT(*) FILTER (WHERE churn = 'Yes') AS churned_customers,
+    ROUND(AVG(monthlycharges::NUMERIC), 2) AS avg_monthly_charges,
+    ROUND(
+        100.0 * COUNT(*) FILTER (WHERE churn = 'Yes')
+        / NULLIF(COUNT(*), 0), 2
+    ) AS churn_rate_pct
+FROM public.customer_churn
+GROUP BY 1;
+
+
+-- 7. CHURN BY ONLINE SECURITY AND TECH SUPPORT
+-- Each service type is reported separately.
+-- Filter service_type in Power BI to avoid double counting.
+
+CREATE OR REPLACE VIEW public.vw_churn_by_service_support AS
+
+SELECT
+    'Online Security' AS service_type,
+    onlinesecurity AS service_status,
+    COUNT(*) AS total_customers,
+    COUNT(*) FILTER (WHERE churn = 'Yes') AS churned_customers,
+    ROUND(
+        100.0 * COUNT(*) FILTER (WHERE churn = 'Yes')
+        / NULLIF(COUNT(*), 0), 2
+    ) AS churn_rate_pct
+FROM public.customer_churn
+GROUP BY onlinesecurity
+
+UNION ALL
+
+SELECT
+    'Tech Support' AS service_type,
+    techsupport AS service_status,
+    COUNT(*) AS total_customers,
+    COUNT(*) FILTER (WHERE churn = 'Yes') AS churned_customers,
+    ROUND(
+        100.0 * COUNT(*) FILTER (WHERE churn = 'Yes')
+        / NULLIF(COUNT(*), 0), 2
+    ) AS churn_rate_pct
+FROM public.customer_churn
+GROUP BY techsupport;
+
+
+-- =========================================================
+-- 8. VERIFY THE RESULTS
+-- Run each query separately to inspect the views.
+-- =========================================================
+
+SELECT * FROM public.vw_churn_overview;
+
+SELECT * FROM public.vw_churn_by_contract
+ORDER BY churn_rate_pct DESC;
+
+SELECT * FROM public.vw_churn_by_tenure;
+
+SELECT * FROM public.vw_churn_by_internet_service
+ORDER BY churn_rate_pct DESC;
+
+SELECT * FROM public.vw_churn_by_payment_method
+ORDER BY churn_rate_pct DESC;
+
+SELECT * FROM public.vw_churn_by_monthly_charges
+ORDER BY churn_rate_pct DESC;
+
+SELECT * FROM public.vw_churn_by_service_support
+ORDER BY service_type, churn_rate_pct DESC;
